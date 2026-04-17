@@ -1,11 +1,49 @@
 #Requires -RunAsAdministrator
-
-function New-Cfg { # Create a new .cfg file based on user options.
-    ### TODO
-}
-
 function Set-Cfg { # Change values within the .cfg if we already did the installation correctly.
-    ### TODO
+    $vp8_opt
+    $vp8l_opt
+    $vp8x_gif_opt
+    $vp8x_opt
+    Write-Host "VP8 (lossy, no transparency) .webp format conversion? (.png or .jpg)"
+    $user_input = Read-Host -Prompt "Enter .png or .jpg: (default: .jpg)`n"
+    $cleaned_input = $user_input -replace '[^0-9A-Za-z_]' # Remove all non alphanumerical characters
+    if($cleaned_input -eq "png"){
+        $vp8_opt = ".png"
+    }
+    else{
+	    $vp8_opt = ".jpg"
+    }
+    Write-Host "VP8L (lossless, can have transparency) .webp format conversion? (.png or .jpg)"
+    $user_input = Read-Host -Prompt "Enter .png or .jpg: (default: .png)`n"
+    $cleaned_input = $user_input -replace '[^0-9A-Za-z_]' # Remove all non alphanumerical characters
+    if($cleaned_input -eq "jpg"){
+        $vp8_opt = ".jpg"
+    }
+    else{
+	    $vp8_opt = ".png"
+    }
+    Write-Host "Allow VP8X .webp (extended format) with animation flag to be saved as gif?"
+    $user_input = Read-Host -Prompt "Enter Y or N: (default: Y)`n"
+    $cleaned_input = $user_input -replace '[^0-9A-Za-z_]' # Remove all non alphanumerical characters
+    if($cleaned_input -eq "n"){
+	    $vp8x_gif_opt = $False
+    }
+    else{
+	    $vp8x_gif_opt = $True
+    }
+    Write-Host "VP8X (non-animated) .webp format conversion? (.png or .jpg)"
+    $user_input = Read-Host -Prompt "Enter .png or .jpg: (default: .png)`n"
+    $cleaned_input = $user_input -replace '[^0-9A-Za-z_]' # Remove all non alphanumerical characters
+    if($cleaned_input -eq "jpg"){
+        $vp8_opt = ".jpg"
+    }
+    else{
+	    $vp8_opt = ".png"
+    }
+    # Force rewrite of the CFG file.
+    $reg_install_path = Get-ItemPropertyValue -Path "HKLM:\SOFTWARE\webp-fix" -Name "Location" # reference the install folder path that was added to the registry, as we need this function to work outside of the first open
+    $cfg_location =  $reg_install_path + "config.cfg"
+    Set-Content -Path $cfg_location -Value "vp8-format=$vp8_opt`nvp8l_format=$vp8l_opt`nvp8x_anim_gif=$vp8_gif_opt`nvp8x_format=$vp8x_opt"
 }
 
 function Install-PS2EXE { # Function to verify PS2EXE is installed within powershell.
@@ -53,7 +91,7 @@ function Install-PS2EXE { # Function to verify PS2EXE is installed within powers
 }
 
 function Install-Script { # Create an exe from the provided webp-fix powershell script and "install" it to a folder of the user's choosing.
-    $output_location = Read-Host -Prompt "Please enter a valid install directory (default: C:\Program Files\webp-fix):"
+    $script:output_location = Read-Host -Prompt "Please enter a valid and full install directory (default: C:\Program Files\webp-fix):"
     if($output_location -eq ""){ # No input? Default option.
         $output_location =  "C:\Program Files\webp-fix"
     }
@@ -97,24 +135,25 @@ function Install-Script { # Create an exe from the provided webp-fix powershell 
     }
 }
 
-function Add-InstallRegistry { # Add a registry entry to confirm that the program was installed
+function Add-InstallRegistry { # Add a registry entry to confirm that the program was installed and it's location
     try{
-        New-itemProperty -Path "HKCU:\Software\webp-fix" -Name "Installed" -Value 1 -PropertyType DWORD -Force
+        New-ItemProperty -Path "HKCU:\SOFTWARE\webp-fix" -Name "Installed" -Value 1 -PropertyType DWORD -Force
+        New-ItemProperty -Path "HKCU:\SOFTWARE\webp-fix" -Name "Location" -Value $output_location -PropertyType String -Force
     }
     catch{
-        Write-Error "Couldn't create registry value."
+        Write-Error "Couldn't create registry value(s)."
     }
 }
 function Add-AssocRegistry { # Add a registry entry to confirm that the program was associated with .webp
     try{
-        New-itemProperty -Path "HKCU:\Software\webp-fix" -Name "Assoc" -Value 1 -PropertyType DWORD -Force
+        New-itemProperty -Path "HKCU:\SOFTWARE\webp-fix" -Name "Assoc" -Value 1 -PropertyType DWORD -Force
     }
     catch{
         Write-Error "Couldn't create registry value."
     }
 }
 function Confirm-InstallRegistry { # Confirm a registry entry was already created (program installed successfully)
-    Get-Item "HKLM:\SOFTWARE\MyKey".Property -contains "Installed"
+    Get-Item "HKLM:\SOFTWARE\MyKey".Property -contains "Installed" -and Get-Item "HKLM:\SOFTWARE\MyKey".Property -contains "Location"
 }
 
 function Confirm-AssocRegistry{ # Confirm a registry entry was already created (assoc happened successfully)
@@ -146,10 +185,11 @@ function Set-Assoc {
     }
 }
 
-if(Confirm-InstallRegistry -and Confirm-AssocRegistry){ # If our program has already been installed, and the file association has been created.
+if(Confirm-InstallRegistry -and Confirm-AssocRegistry){ # If our program has already been installed, and the file association has been created, that means the user just wants to change the cfg.
     Set-Cfg
 }
-else{ # Otherwise, it's our first time and we need to install.
+else{ # Otherwise, it's our first time and we need to install and create a cfg.
     Install-Script
     Set-Assoc
+    Set-Cfg
 }
