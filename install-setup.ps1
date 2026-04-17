@@ -107,7 +107,7 @@ function Install-Script { # Create an exe from the provided webp-fix powershell 
     $script:output_file = Join-path $output_location -ChildPath "webp-fix.exe" # Make this available script-wide so we can create the assoc later.
     if(Install-PS2EXE){ # Make sure PS2EXE is installed before running this.
         $input_file = Join-Path $PSScriptRoot -ChildPath "webp-fix.ps1" # get our script file from within the "install" folder
-        if(!(Test-File -path $input_file -PathType Leaf)){ # Let's make sure that the user has all the files needed in order. If not, exit immediately.
+        if(!(Test-Path -path $input_file -PathType Leaf)){ # Let's make sure that the user has all the files needed in order. If not, exit immediately.
             Write-Error "webp-fix.ps1 Doesn't exist. Ensure your install folder contains it."
             $null = Read-Host "Exiting script. Press any key to continue..."
             Exit
@@ -124,7 +124,7 @@ function Install-Script { # Create an exe from the provided webp-fix powershell 
         $null = Read-Host "Exiting script. Press any key to continue..."
         Exit
     }
-    if(Test-File -path $output_file -PathType Leaf){ # Check if we created the exe.
+    if(Test-Path -path $output_file -PathType Leaf){ # Check if we created the exe.
         Write-Host "Installed webp-fix.exe correctly."
         Add-InstallRegistry # Add a registry entry indicated that we completed the install correctly.
     }  
@@ -153,11 +153,11 @@ function Add-AssocRegistry { # Add a registry entry to confirm that the program 
     }
 }
 function Confirm-InstallRegistry { # Confirm a registry entry was already created (program installed successfully)
-    Get-Item "HKLM:\SOFTWARE\MyKey".Property -contains "Installed" -and Get-Item "HKLM:\SOFTWARE\MyKey".Property -contains "Location"
+    (Get-Item "HKLM:\SOFTWARE\MyKey".Property -contains "Installed" -ErrorAction SilentlyContinue) -and (Get-Item "HKLM:\SOFTWARE\MyKey".Property -contains "Location" -ErrorAction SilentlyContinue)
 }
 
 function Confirm-AssocRegistry{ # Confirm a registry entry was already created (assoc happened successfully)
-    Get-Item "HKLM:\SOFTWARE\MyKey".Property -contains "Assoc"
+    Get-Item "HKLM:\SOFTWARE\MyKey".Property -contains "Assoc" -ErrorAction SilentlyContinue
 }
 function Set-Assoc {
     $problem = $False
