@@ -180,7 +180,7 @@ function Set-Assoc {
     }
     $output_file_cmd = '"' + $output_file + '"'
     Write-Host "Trying command: cmd /c ftype webp=$output_file"
-    cmd /c ftype webp=$output_file_cmd
+    cmd /c ftype webp=$output_file_cmd %1
     if ($LASTEXITCODE -ne 0) {
         Write-Host "A problem occurred attempting to invoke command prompt."
         $problem = $True
