@@ -1,4 +1,4 @@
-[h2]webp-fix[/h2]
+##webp-fix
 
 **webp-fix is a PowerShell script package intended to be a simple fix for the .webp format.**
 
