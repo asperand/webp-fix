@@ -1,5 +1,24 @@
 #Requires -RunAsAdministrator
 $script:reg_path = "HKCU:\SOFTWARE\wepb-fix"
+function Revert-Progress{
+    Write-Host "There was a problem finishing the install. Cleaning up partial install."
+    $install_location = Get-ItemPropertyValue -Path $reg_path -Name "Location"
+    if($?){ #If we can actually get the install location from the registry
+        try{Remove-Item -path $install_location}
+        catch{Write-Host "Issue removing install folder. It may have not been created."}
+    }
+    try{Remove-Item -Path $reg_path -Force} # Clean up any created registry entries.
+    catch{Write-Host "Issue removing registry entry $reg_path. It may have not been created."}
+    cmd /c ftype webp=
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "A problem occurred attempting to remove ftype."
+    }
+    cmd /c assoc .webp=
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "A problem occurred attempting to remove assoc."
+    }
+}
+
 function Set-Cfg { # Change values within the .cfg if we already did the installation correctly.
     $vp8_opt
     $vp8l_opt
