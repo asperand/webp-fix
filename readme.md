@@ -2,7 +2,7 @@
 
 **webp-fix is a PowerShell script package intended to be a simple fix for the .webp format.**
 
-While the webp format can be easily viewed on Windows machines, many upload services only accept .png, .jpg, or .gif files, NOT .webp.
+While the webp format can be easily viewed on Windows machines, many upload services only accept .png, .jpg, or .gif files and NOT .webp.
 
 To solve this issue, the install script creates an application that gets associated with the .webp file extension. When opened, the image is instantly converted to a different format.
 
