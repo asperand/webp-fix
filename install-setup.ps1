@@ -1,14 +1,32 @@
 #Requires -RunAsAdministrator
 $script:reg_path = "HKCU:\SOFTWARE\wepb-fix"
-function Revert-Progress{
+function Reset-Progress{
     Write-Host "There was a problem finishing the install. Cleaning up partial install."
     $install_location = Get-ItemPropertyValue -Path $reg_path -Name "Location"
     if($?){ #If we can actually get the install location from the registry
-        try{Remove-Item -path $install_location}
-        catch{Write-Host "Issue removing install folder. It may have not been created."}
+        try{Remove-Item -Path $install_location}
+        catch{
+            Write-Host "Issue removing install folder."
+            if(Test-Path -Path $install_location){
+                Write-Host "Path $install_location exists, but couldn't be removed by the script."
+                Get-Acl -Path $install_location
+            }
+            else{
+                Write-Host "Path $install_location does not exist. It may have not been created. Continuing..."
+            }
+        }
     }
     try{Remove-Item -Path $reg_path -Force} # Clean up any created registry entries.
-    catch{Write-Host "Issue removing registry entry $reg_path. It may have not been created."}
+    catch{
+        Write-Host "Issue removing registry entry $reg_path."
+        if(Test-Path -Path $reg_path){
+            Write-Host "Registry entry $reg_path exists, but couldn't be removed by the script."
+            Write-Host "Manual intervention may be required."
+        }
+        else{
+            Write-Host "Registry entry $reg_path does not exist. It may have not been created. Continuing..."
+        }
+    }
     cmd /c ftype webp=
     if ($LASTEXITCODE -ne 0) {
         Write-Host "A problem occurred attempting to remove ftype."
@@ -17,6 +35,8 @@ function Revert-Progress{
     if ($LASTEXITCODE -ne 0) {
         Write-Host "A problem occurred attempting to remove assoc."
     }
+    Write-Host -Prompt "Installation failed. Press any key to close"
+    Exit
 }
 
 function Set-Cfg { # Change values within the .cfg if we already did the installation correctly.
@@ -35,7 +55,7 @@ function Set-Cfg { # Change values within the .cfg if we already did the install
     }
     Write-Host "VP8L (lossless, can have transparency) .webp format conversion? (.png or .jpg)"
     $user_input = Read-Host -Prompt "Enter .png or .jpg (default: .png) "
-    $cleaned_input = $user_input -replace '[^0-9A-Za-z_]' # Remove all non alphanumerical characters
+    $cleaned_input = $user_input -replace '[^0-9A-Za-z_]'
     if($cleaned_input -eq "jpg"){
         $vp8l_opt = ".jpg"
     }
@@ -44,7 +64,7 @@ function Set-Cfg { # Change values within the .cfg if we already did the install
     }
     Write-Host "Allow VP8X .webp (extended format) with animation flag to be saved as gif?"
     $user_input = Read-Host -Prompt "Enter Y or N (default: Y) "
-    $cleaned_input = $user_input -replace '[^0-9A-Za-z_]' # Remove all non alphanumerical characters
+    $cleaned_input = $user_input -replace '[^0-9A-Za-z_]'
     if($cleaned_input -eq "n"){
 	    $vp8x_gif_opt = "true"
     }
@@ -53,7 +73,7 @@ function Set-Cfg { # Change values within the .cfg if we already did the install
     }
     Write-Host "VP8X (non-animated) .webp format conversion? (.png or .jpg)"
     $user_input = Read-Host -Prompt "Enter .png or .jpg (default: .png) "
-    $cleaned_input = $user_input -replace '[^0-9A-Za-z_]' # Remove all non alphanumerical characters
+    $cleaned_input = $user_input -replace '[^0-9A-Za-z_]'
     if($cleaned_input -eq "jpg"){
         $vp8x_opt = ".jpg"
     }
@@ -104,8 +124,8 @@ function Install-PS2EXE { # Function to verify PS2EXE is installed within powers
         }
         if(!$ps2exe_installed){ # Still isn't installed? Let's just exit and prompt the user to manually install it.
             Write-Error "Couldn't install ps2exe, or couldn't verify it's installation."
-            $null = Read-Host "Exiting script. You may need to manually install ps2exe on your Powershell.`nPress any key to continue..."
-            Exit
+            Write-Host "You may need to manually install ps2exe (Install-Module -Name ps2exe). Press any key to continue"
+            Reset-Progress
         }
     }
     $ps2exe_installed
@@ -131,7 +151,7 @@ function Install-Script { # Create an exe from the provided webp-fix powershell 
         if(!(Test-Path -path $input_file -PathType Leaf)){ # Let's make sure that the user has all the files needed in order. If not, exit immediately.
             Write-Error "webp-fix.ps1 Doesn't exist. Ensure your install folder contains it."
             $null = Read-Host "Exiting script. Press any key to continue..."
-            Exit
+            Reset-Progress
         }
         try { # Try to create an exe file using ps2-exe.
             Invoke-ps2exe -inputfile $input_file -outputFile $output_file
@@ -142,23 +162,20 @@ function Install-Script { # Create an exe from the provided webp-fix powershell 
     }
     else{ # This fires if no ps2exe exists.
         Write-Error "Couldn't verify if ps2exe is installed correctly."
-        $null = Read-Host "Exiting script. Press any key to continue..."
-        Exit
+        Reset-Progress
     }
     if(Test-Path -path $output_file -PathType Leaf){ # Check if we created the exe.
         Write-Host "Installed webp-fix.exe correctly."
         Add-InstallRegistry # Add a registry entry indicated that we completed the install correctly.
     }  
     else{ # Whoops, what happened? TODO: is it possible to fix this if something gets messed up along the install?
-        Write-Error "It seems like webp-fix.exe wasn't installed correctly. Please verify your Program Files folder."
-        $null = Read-Host -NoNewLine "Exiting script. Press any key to continue..."
-        Exit
+        Write-Error "It seems like webp-fix.exe wasn't installed correctly. Please verify your indicated install directory."
+        Reset-Progress
     }
 }
 
 function Add-InstallRegistry { # Add a registry entry to confirm that the program was installed and it's location
-    try{
-        
+    try{ 
 	    New-Item -Path $reg_path -Force
         New-ItemProperty -Path $reg_path -Name "Installed" -Value 1 -PropertyType DWORD -Force
         New-ItemProperty -Path $reg_path -Name "Location" -Value $output_location -PropertyType String -Force
@@ -180,7 +197,7 @@ function Confirm-InstallRegistry { # Confirm a registry entry was already create
         Test-Path $reg_path
     }
     catch{
-        Write-Host "Install Registry path not found. Continuing with installation."
+        Write-Host "Registry entry couldn't be verified. Continuing with installation."
         $False
     }
 }
@@ -205,10 +222,9 @@ function Set-Assoc {
         $problem = $True
     }
     if($problem) {
-        #TODO: Try other method? for now, we will print an error and exit.
+        #TODO: Is there another method for this?
         Write-Error "Couldn't create a file association with webp-fix."
-        $null = Read-Host "Exiting script. Press any key to continue..."
-        Exit
+        Reset-Progress
     }
     else{
         Add-AssocRegistry
